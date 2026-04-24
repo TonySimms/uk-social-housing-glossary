@@ -1,26 +1,25 @@
+import Busboy from "busboy";
 import XLSX from "xlsx";
 
 /**
- * Helper: commit data.json to GitHub
+ * Commit data.json to GitHub
  */
 async function commitToGitHub({ content, message }) {
-  const owner = "TonySimms"; // 🔴 CHANGE if different
+  const owner = "TonySimms";          // ✅ change if needed
   const repo = "uk-social-housing-glossary";
   const path = "data.json";
 
-  const apiBase = "https://api.github.com";
   const headers = {
     Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-    "Accept": "application/vnd.github+json"
+    Accept: "application/vnd.github+json"
   };
 
-  // Get current file SHA (if exists)
-  const getRes = await fetch(
-    `${apiBase}/repos/${owner}/${repo}/contents/${path}`,
+  const get = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
     { headers }
   );
 
-  const existing = getRes.ok ? await getRes.json() : null;
+  const existing = get.ok ? await get.json() : null;
 
   const body = {
     message,
@@ -28,8 +27,8 @@ async function commitToGitHub({ content, message }) {
     ...(existing?.sha && { sha: existing.sha })
   };
 
-  const putRes = await fetch(
-    `${apiBase}/repos/${owner}/${repo}/contents/${path}`,
+  const put = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
     {
       method: "PUT",
       headers,
@@ -37,86 +36,85 @@ async function commitToGitHub({ content, message }) {
     }
   );
 
-  if (!putRes.ok) {
-    const err = await putRes.text();
-    throw new Error("GitHub commit failed: " + err);
+  if (!put.ok) {
+    throw new Error(await put.text());
   }
 }
 
 export const config = {
-  runtime: "nodejs"
+  api: {
+    bodyParser: false
+  }
 };
 
-export default async function handler(req, res) {
-  try {
-    // Method
-    if (req.method !== "POST") {
-      return res.status(405).json({ error: "Method not allowed" });
-    }
-
-    // Password check
-    if (req.headers["x-admin-password"] !== process.env.ADMIN_PASSWORD) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    // Read upload
-    const formData = await req.formData();
-    const file = formData.get("file");
-    if (!file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // Parse Excel
-    const workbook = XLSX.read(buffer);
-    const sheet = workbook.Sheets["Public Glossary"];
-    if (!sheet) {
-      return res.status(400).json({
-        error: "Missing 'Public Glossary' sheet"
-      });
-    }
-
-    const rows = XLSX.utils.sheet_to_json(sheet);
-
-    const entries = rows
-      .map(r => ({
-        term: r["Term"],
-        acronym: r["Acronym"] || "",
-        theme: r["Theme"] || "",
-        type: r["Type"] || "",
-        jurisdiction: r["Jurisdiction"] || "",
-        definition: r["Plain-English definition"] || "",
-        operational: r["Operational use"] || "",
-        caution: r["Key caution / dependency"] || "",
-        priority: r["Review priority"] || "Low",
-        source: r["Source URL"] || ""
-      }))
-      .filter(e => e.term);
-
-    const json = JSON.stringify(
-      {
-        updatedAt: new Date().toISOString(),
-        entries
-      },
-      null,
-      2
-    );
-
-    // Commit to GitHub
-    await commitToGitHub({
-      content: json,
-      message: `Update glossary (${entries.length} terms)`
-    });
-
-    return res.json({
-      success: true,
-      count: entries.length
-    });
-
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message });
+export default function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
+
+  if (req.headers["x-admin-password"] !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const bb = Busboy({ headers: req.headers });
+  let fileBuffer = null;
+
+  bb.on("file", (_, file) => {
+    const chunks = [];
+    file.on("data", d => chunks.push(d));
+    file.on("end", () => {
+      fileBuffer = Buffer.concat(chunks);
+    });
+  });
+
+  bb.on("finish", async () => {
+    try {
+      if (!fileBuffer) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const workbook = XLSX.read(fileBuffer);
+      const sheet = workbook.Sheets["Public Glossary"];
+
+      if (!sheet) {
+        return res
+          .status(400)
+          .json({ error: "Missing 'Public Glossary' sheet" });
+      }
+
+      const rows = XLSX.utils.sheet_to_json(sheet);
+
+      const entries = rows
+        .map(r => ({
+          term: r["Term"],
+          acronym: r["Acronym"] || "",
+          theme: r["Theme"] || "",
+          type: r["Type"] || "",
+          jurisdiction: r["Jurisdiction"] || "",
+          definition: r["Plain-English definition"] || "",
+          operational: r["Operational use"] || "",
+          caution: r["Key caution / dependency"] || "",
+          priority: r["Review priority"] || "Low",
+          source: r["Source URL"] || ""
+        }))
+        .filter(e => e.term);
+
+      await commitToGitHub({
+        content: JSON.stringify(
+          { updatedAt: new Date().toISOString(), entries },
+          null,
+          2
+        ),
+        message: `Update glossary (${entries.length} terms)`
+      });
+
+      res.json({ success: true, count: entries.length });
+
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Upload failed" });
+    }
+  });
+
+  req.pipe(bb);
 }
-``
