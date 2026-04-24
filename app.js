@@ -22,23 +22,25 @@ searchInput.addEventListener("input", e => {
     .map(entry => {
       let score = 0;
 
-      const term = entry.term.toLowerCase();
+      const term = (entry.term || "").toLowerCase();
       const acronym = (entry.acronym || "").toLowerCase();
-      const theme = entry.theme.toLowerCase();
-      const type = entry.type.toLowerCase();
-      const definition = entry.definition.toLowerCase();
+      const theme = (entry.theme || "").toLowerCase();
+      const type = (entry.type || "").toLowerCase();
+      const definition = (entry.definition || "").toLowerCase();
+      const operational = (entry.operational || "").toLowerCase();
 
-      // Strongest matches
+      // Strong matches
       if (term.startsWith(q)) score += 100;
       else if (term.includes(q)) score += 70;
 
       if (acronym === q) score += 60;
       else if (acronym.includes(q)) score += 40;
 
-      // Weaker but still relevant
+      // Broader relevance
       if (theme.includes(q)) score += 20;
       if (type.includes(q)) score += 15;
       if (definition.includes(q)) score += 10;
+      if (operational.includes(q)) score += 5;
 
       return { entry, score };
     })
@@ -47,10 +49,6 @@ searchInput.addEventListener("input", e => {
     .map(item => item.entry);
 
   renderResults(scored);
-});
-
-});
-``
 });
 
 function renderResults(entries) {
