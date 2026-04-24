@@ -1,0 +1,9 @@
+{
+  "name": "uk-social-housing-glossary",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "formidable": "^3.5.1",
+    "xlsx": "^0.19.3"
+  }
+}
