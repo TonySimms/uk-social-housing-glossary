@@ -1,7 +1,7 @@
 let glossaryEntries = [];
 
 fetch("data.json")
-  .then(response => response.json())
+  .then(res => res.json())
   .then(data => {
     glossaryEntries = data.entries;
     renderResults(glossaryEntries);
@@ -9,8 +9,8 @@ fetch("data.json")
 
 const searchInput = document.getElementById("search");
 
-searchInput.addEventListener("input", event => {
-  const query = event.target.value.toLowerCase().trim();
+searchInput.addEventListener("input", e => {
+  const q = e.target.value.toLowerCase().trim();
 
   const filtered = glossaryEntries.filter(entry =>
     [
@@ -23,7 +23,7 @@ searchInput.addEventListener("input", event => {
     ]
       .join(" ")
       .toLowerCase()
-      .includes(query)
+      .includes(q)
   );
 
   renderResults(filtered);
@@ -39,18 +39,50 @@ function renderResults(entries) {
   }
 
   entries.forEach(entry => {
-    const item = document.createElement("div");
-    item.style.borderLeft = "4px solid #ccc";
-    item.style.padding = "0.75rem";
-    item.style.marginBottom = "1rem";
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.borderLeftColor = priorityColour(entry.priority);
 
-    item.innerHTML = `
-      <h3>${entry.term}${entry.acronym ? ` (${entry.acronym})` : ""}</h3>
-      <small>${entry.theme} · ${entry.type} · UK (All nations)</small>
+    card.innerHTML = `
+      <h3>
+        ${entry.term}${entry.acronym ? ` (${entry.acronym})` : ""}
+        ${priorityBadge(entry.priority)}
+      </h3>
+
+      <div class="meta">
+        ${entry.theme} · ${entry.type} · UK (All nations)
+      </div>
+
       <p>${entry.definition}</p>
+
+      <details>
+        <summary>Operational use</summary>
+        <p>${entry.operational || "No operational guidance provided."}</p>
+      </details>
+
+      ${
+        entry.caution
+          ? `<div class="caution"><strong>Key caution:</strong> ${entry.caution}</div>`
+          : ""
+      }
     `;
 
-    results.appendChild(item);
+    results.appendChild(card);
   });
 }
-``
+
+function priorityBadge(priority) {
+  const p = priority.toLowerCase();
+  return `<span class="badge ${p}">${priority}</span>`;
+}
+
+function priorityColour(priority) {
+  switch (priority.toLowerCase()) {
+    case "high":
+      return "#d97706";
+    case "medium":
+      return "#f59e0b";
+    default:
+      return "#9ca3af";
+  }
+}
