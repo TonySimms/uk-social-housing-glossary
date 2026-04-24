@@ -9,24 +9,48 @@ fetch("data.json")
 
 const searchInput = document.getElementById("search");
 
+
 searchInput.addEventListener("input", e => {
   const q = e.target.value.toLowerCase().trim();
 
-  const filtered = glossaryEntries.filter(entry =>
-    [
-      entry.term,
-      entry.acronym,
-      entry.definition,
-      entry.operational,
-      entry.theme,
-      entry.type
-    ]
-      .join(" ")
-      .toLowerCase()
-      .includes(q)
-  );
+  if (!q) {
+    renderResults(glossaryEntries);
+    return;
+  }
 
-  renderResults(filtered);
+  const scored = glossaryEntries
+    .map(entry => {
+      let score = 0;
+
+      const term = entry.term.toLowerCase();
+      const acronym = (entry.acronym || "").toLowerCase();
+      const theme = entry.theme.toLowerCase();
+      const type = entry.type.toLowerCase();
+      const definition = entry.definition.toLowerCase();
+
+      // Strongest matches
+      if (term.startsWith(q)) score += 100;
+      else if (term.includes(q)) score += 70;
+
+      if (acronym === q) score += 60;
+      else if (acronym.includes(q)) score += 40;
+
+      // Weaker but still relevant
+      if (theme.includes(q)) score += 20;
+      if (type.includes(q)) score += 15;
+      if (definition.includes(q)) score += 10;
+
+      return { entry, score };
+    })
+    .filter(item => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.entry);
+
+  renderResults(scored);
+});
+
+});
+``
 });
 
 function renderResults(entries) {
