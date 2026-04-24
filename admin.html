@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Glossary Admin Upload</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #fafafa;
+      padding: 2rem;
+    }
+
+    main {
+      max-width: 32rem;
+      background: #ffffff;
+      padding: 1.5rem;
+      border-radius: 4px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 1.25rem;
+    }
+
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: 600;
+    }
+
+    input[type="password"],
+    input[type="file"] {
+      width: 100%;
+      margin-top: 0.4rem;
+    }
+
+    button {
+      margin-top: 1.25rem;
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .message {
+      margin-top: 1rem;
+      padding: 0.6rem;
+      border-radius: 3px;
+    }
+
+    .success {
+      background: #ecfdf5;
+      color: #065f46;
+    }
+
+    .error {
+      background: #fef2f2;
+      color: #991b1b;
+    }
+  </style>
+</head>
+<body>
+
+<main>
+  <h1>Glossary admin upload</h1>
+
+  <p>
+    Upload a new Excel glossary file. This will immediately replace the live glossary.
+  </p>
+
+  <label for="password">Admin password</label>
+  <input id="password" type="password" autocomplete="off">
+
+  <label for="file">Excel file</label>
+  <input id="file" type="file" accept=".xlsx">
+
+  <button id="upload">Upload glossary</button>
+
+  <div id="message"></div>
+</main>
+
+<script>
+  const uploadButton = document.getElementById("upload");
+  const messageBox = document.getElementById("message");
+
+  uploadButton.addEventListener("click", async () => {
+    messageBox.textContent = "";
+    messageBox.className = "";
+
+    const password = document.getElementById("password").value;
+    const fileInput = document.getElementById("file");
+
+    if (!password || fileInput.files.length === 0) {
+      messageBox.textContent = "Password and file are required.";
+      messageBox.className = "message error";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    try {
+      const response = await fetch("/api/admin-upload", {
+        method: "POST",
+        headers: {
+          "x-admin-password": password
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Upload failed");
+      }
+
+      messageBox.textContent = `Upload successful. ${data.count} terms updated.`;
+      messageBox.className = "message success";
+
+    } catch (err) {
+      messageBox.textContent = err.message;
+      messageBox.className = "message error";
+    }
+  });
+</script>
+
+</body>
+</html>
+``
